@@ -15,6 +15,10 @@ Servo gateServo;
 #define TRIG_PIN 12
 #define ECHO_PIN 14
 
+// ===== LED =====
+#define LED_MERAH 4
+#define LED_HIJAU 2
+
 // ===== UID VALID =====
 String authorizedUID = "C521C906";
 
@@ -30,11 +34,19 @@ void setup() {
 
   // Servo
   gateServo.attach(SERVO_PIN);
-  gateServo.write(0); // posisi tertutup
+  gateServo.write(0);
 
   // Ultrasonic
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
+
+  // LED
+  pinMode(LED_MERAH, OUTPUT);
+  pinMode(LED_HIJAU, OUTPUT);
+
+  // Status awal: merah menyala
+  digitalWrite(LED_MERAH, HIGH);
+  digitalWrite(LED_HIJAU, LOW);
 
   Serial.println("Gate Ready...");
 }
@@ -60,7 +72,12 @@ float readDistance() {
 // ===== LOOP =====
 //
 void loop() {
-  // Cek kartu RFID
+
+  // ===== IDLE STATE =====
+  digitalWrite(LED_MERAH, HIGH);
+  digitalWrite(LED_HIJAU, LOW);
+
+  // Cek kartu
   if (!mfrc522.PICC_IsNewCardPresent()) return;
   if (!mfrc522.PICC_ReadCardSerial()) return;
 
@@ -75,9 +92,15 @@ void loop() {
   Serial.print("UID: ");
   Serial.println(uid);
 
-  // Jika kartu valid → buka gerbang
+  // ===== UID BENAR =====
   if (uid == authorizedUID) {
-    Serial.println("Akses diterima - Gerbang dibuka");
+    Serial.println("Akses diterima");
+
+    // LED hijau ON
+    digitalWrite(LED_MERAH, LOW);
+    digitalWrite(LED_HIJAU, HIGH);
+
+    // Buka gerbang
     gateServo.write(90);
 
     // Tunggu objek lewat
@@ -86,16 +109,15 @@ void loop() {
       Serial.print("Jarak: ");
       Serial.println(distance);
 
-      // Jika objek terdeteksi lewat (< 15 cm)
       if (distance > 0 && distance < 15) {
         Serial.println("Objek lewat...");
-        
+
         // Tunggu sampai objek menjauh
         while (readDistance() < 15) {
           delay(100);
         }
 
-        Serial.println("Objek sudah lewat, gerbang menutup");
+        Serial.println("Objek sudah lewat");
         break;
       }
       delay(200);
@@ -103,10 +125,18 @@ void loop() {
 
     // Tutup gerbang
     gateServo.write(0);
-    delay(1000);
+
+    // Kembali ke idle (merah ON)
+    digitalWrite(LED_HIJAU, LOW);
+    digitalWrite(LED_MERAH, HIGH);
   }
+
+  // ===== UID SALAH =====
   else {
     Serial.println("Akses ditolak");
+
+    digitalWrite(LED_MERAH, HIGH);
+    digitalWrite(LED_HIJAU, LOW);
   }
 
   delay(1000);
